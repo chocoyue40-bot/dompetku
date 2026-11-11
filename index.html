@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="id"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Dompetku</title>
+<style>
+:root{--bg:#f4f6fb;--card:#fff;--tx:#111827;--mu:#6b7280;--ac:#3b82f6;--bd:#e5e7eb;--rd:#ef4444;--gr:#16a34a;color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0b0f17;--card:#151b27;--tx:#e8ecf4;--mu:#8b95a7;--bd:#242c3b;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0b0f17;--card:#151b27;--tx:#e8ecf4;--mu:#8b95a7;--bd:#242c3b;color-scheme:dark}
+*{box-sizing:border-box}html,body{margin:0}
+body{background:var(--bg);color:var(--tx);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;max-width:520px;margin:0 auto;padding:16px 14px 90px}
+h1{font-size:20px;margin:0}h2{font-size:15px;margin:18px 0 8px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:12px 14px;margin-bottom:8px}
+.row{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.mu{color:var(--mu);font-size:13px}.big{font-size:26px;font-weight:700;margin:4px 0}.lk{color:var(--ac);cursor:pointer}
+button{font:inherit;border:0;border-radius:10px;padding:9px 13px;background:var(--ac);color:#fff;cursor:pointer}
+button.g{background:transparent;color:var(--ac);border:1px solid var(--bd)}
+button.s{padding:6px 11px;font-size:14px}
+input,select{font:inherit;width:100%;padding:10px;border-radius:10px;border:1px solid var(--bd);background:var(--bg);color:var(--tx);margin:4px 0}
+.nav{position:fixed;left:0;right:0;bottom:0;display:flex;justify-content:center;background:var(--card);border-top:1px solid var(--bd);padding:8px 8px calc(8px + env(safe-area-inset-bottom,0px))}
+.nav div{display:flex;width:100%;max-width:520px;gap:6px}.nav button{flex:1;background:transparent;color:var(--mu)}.nav button.on{color:var(--ac);font-weight:700}
+.sh{position:fixed;inset:0;background:#0008;display:flex;align-items:flex-end;justify-content:center;z-index:9}
+.bx{background:var(--card);width:100%;max-width:520px;border-radius:18px 18px 0 0;padding:16px;max-height:85vh;overflow:auto}
+.in{color:var(--gr)}.out{color:var(--rd)}
+.k{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}.k button{padding:16px 0;font-size:20px;background:var(--card);color:var(--tx);border:1px solid var(--bd)}.k .o{background:var(--ac);color:#fff}
+#disp{font-size:32px;text-align:right;padding:14px 4px;min-height:60px;word-break:break-all}
+.bar{display:flex;gap:6px;margin:10px 0;flex-wrap:wrap}.bar button{flex:1}
+.pg{height:8px;background:var(--bd);border-radius:6px;overflow:hidden;margin:6px 0}.pg i{display:block;height:100%;background:var(--ac)}
+@media print{.nav,.bar,#sheet,.np{display:none!important}body{padding:0}}
+</style></head><body>
+<div id="app"></div><div id="sheet"></div>
+<input type="file" id="fi" accept=".json" style="display:none" onchange="doImp(this)">
+<script>
+const $=s=>document.querySelector(s);
+const rp=n=>(n<0?'-':'')+'Rp '+Math.abs(Math.round(n)).toLocaleString('id-ID');
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function num(v){v=String(v).toLowerCase().replace(/\./g,'').replace(',','.').trim();const m=v.match(/^(\d+(?:\.\d+)?)\s*(k|rb|jt|m)?$/);if(!m)return 0;let n=parseFloat(m[1]);if(m[2]=='k'||m[2]=='rb')n*=1e3;if(m[2]=='jt'||m[2]=='m')n*=1e6;return n}
+function ls(k,v){try{if(v===undefined)return JSON.parse(localStorage.getItem(k));localStorage.setItem(k,JSON.stringify(v))}catch(e){return null}}
+const CT=['Makan','Bensin','Transport','Belanja','Tagihan','Lainnya'];
+/* enkripsi AES-GCM, kunci dari password (PBKDF2) */
+const b64=b=>{let s='';for(const x of new Uint8Array(b))s+=String.fromCharCode(x);return btoa(s)},ub=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
+async function dk(p,salt){const m=await crypto.subtle.importKey('raw',new TextEncoder().encode(p),'PBKDF2',false,['deriveKey']);return crypto.subtle.deriveKey({name:'PBKDF2',salt,iterations:200000,hash:'SHA-256'},m,{name:'AES-GCM',length:256},false,['encrypt','decrypt'])}
+async function enc(k,o){const iv=crypto.getRandomValues(new Uint8Array(12));const c=await crypto.subtle.encrypt({name:'AES-GCM',iv},k,new TextEncoder().encode(JSON.stringify(o)));return{iv:b64(iv),c:b64(c)}}
+async function dec(k,r){return JSON.parse(new TextDecoder().decode(await crypto.subtle.decrypt({name:'AES-GCM',iv:ub(r.iv)},k,ub(r.c))))}
+let user=null,K=null,S=null,tab='w',expr='',pm=false,tm;
+const def=()=>({nid:3,f:[{id:1,n:'Umum'}],w:[{id:1,f:1,n:'Uang Darurat',a:0,g:0,m:0,p:0},{id:2,f:1,n:'Bensin',a:0,g:0,m:0,p:0}],t:[]});
+async function save(){if(user=='tamu')ls('v2d:tamu',S);else ls('v2d:'+user,await enc(K,S))}
+function arm(){clearTimeout(tm);if(user&&user!='tamu')tm=setTimeout(()=>lock('Terkunci otomatis. Masuk lagi.'),18e4)}
+['click','keydown','touchstart'].forEach(e=>addEventListener(e,arm,{passive:true}));
+function lock(m){user=null;K=null;S=null;cl();login(m)}
+function start(){tab='w';render();arm()}
+function guest(){user='tamu';S=ls('v2d:tamu')||def();start()}
+function login(m){$('#app').innerHTML=`<h1>Dompetku</h1><p class="mu">Catat ke mana uangmu pergi.</p><div class="card">
+ <input id="u" placeholder="Username" autocomplete="username"><input id="p" type="password" placeholder="Password (min 6 karakter)" autocomplete="current-password">
+ <div id="er" class="out mu">${m||''}</div><div class="bar"><button onclick="auth(0)">Masuk</button><button class="g" onclick="auth(1)">Daftar</button></div>
+ <button class="g" style="width:100%;margin-bottom:6px" onclick="guest()">Masuk sebagai tamu</button><button class="g" style="width:100%" onclick="$('#fi').click()">Impor backup</button></div>
+ <p class="mu">Data akun dienkripsi dengan password dan disimpan di HP ini. Lupa password = data tidak bisa dibuka, jadi rutin backup. Mode tamu tidak dienkripsi.</p>`}
+async function auth(reg){const u=$('#u').value.trim().toLowerCase(),p=$('#p').value,er=$('#er');
+ if(!u||p.length<6)return er.textContent='Isi username dan password (min 6 karakter).';
+ if(u=='tamu')return er.textContent='Username itu tidak bisa dipakai.';
+ const us=ls('v2u')||{};er.textContent='Memproses...';
+ try{if(reg){if(us[u])return er.textContent='Username sudah ada.';const salt=crypto.getRandomValues(new Uint8Array(16));us[u]=b64(salt);K=await dk(p,salt);user=u;S=def();await save();ls('v2u',us);start()}
+ else{if(!us[u]||!ls('v2d:'+u))return er.textContent='Username atau password salah.';K=await dk(p,ub(us[u]));try{S=await dec(K,ls('v2d:'+u));user=u;start()}catch(e){K=null;er.textContent='Username atau password salah.'}}}
+ catch(e){er.textContent='Enkripsi butuh koneksi aman (HTTPS).'}}
+function render(){
+ const nav=`<div class="nav"><div>${[['w','Dompet'],['c','Kalkulator'],['l','Laporan']].map(x=>`<button class="${tab==x[0]?'on':''}" onclick="tab='${x[0]}';render()">${x[1]}</button>`).join('')}</div></div>`;
+ $('#app').innerHTML=`<div class="row np"><h1>Dompetku</h1><span class="mu">${user=='tamu'?'Tamu':esc(user)} · <span class="lk" onclick="lock()">Keluar</span></span></div>`+(tab=='w'?vw():tab=='c'?vc():vl())+nav}
+function vw(){
+ const tot=S.w.reduce((a,w)=>a+w.a,0),low=S.w.filter(w=>w.m>0&&w.a<=w.m);
+ let h=`<div class="card"><div class="mu">Total semua dompet</div><div class="big">${rp(tot)}</div></div>`;
+ if(low.length)h+=`<div class="card out">⚠ Saldo menipis: ${low.map(w=>esc(w.n)).join(', ')}</div>`;
+ h+=`<div class="bar"><button onclick="split()">Bagi uang</button><button class="g" onclick="addW()">+ Dompet</button><button class="g" onclick="addF()">+ Folder</button></div>`;
+ S.f.forEach(f=>{const ws=S.w.filter(w=>w.f==f.id);h+=`<h2>📁 ${esc(f.n)} <span class="mu">· ${rp(ws.reduce((a,w)=>a+w.a,0))}</span></h2>`;
+  if(!ws.length)h+='<div class="mu">Belum ada dompet.</div>';
+  ws.forEach(w=>{const pc=w.g>0?Math.min(100,Math.round(w.a/w.g*100)):0;h+=`<div class="card"><div class="row"><b>${esc(w.n)}</b><span class="mu"><span class="lk" onclick="ed(${w.id})">edit</span> · <span class="lk" onclick="del(${w.id})">hapus</span></span></div><div class="big">${rp(w.a)}</div>
+  ${w.g>0?`<div class="pg"><i style="width:${pc}%"></i></div><div class="mu">Target ${rp(w.g)} · ${pc}%</div>`:''}
+  ${w.m>0&&w.a<=w.m?`<div class="out mu">⚠ Saldo menipis (batas ${rp(w.m)})</div>`:''}
+  <div class="row" style="justify-content:flex-start;margin-top:6px"><button class="s" onclick="mv(${w.id},'in')">+ Masuk</button><button class="s g" onclick="mv(${w.id},'out')">− Pakai</button></div></div>`})});
+ return h}
+function sheet(h){$('#sheet').innerHTML=`<div class="sh" onclick="if(event.target==this)cl()"><div class="bx">${h}</div></div>`}
+function cl(){$('#sheet').innerHTML=''}
+function mv(id,ty){const w=S.w.find(x=>x.id==id);sheet(`<b>${ty=='in'?'Uang masuk':'Uang keluar'} · ${esc(w.n)}</b><input id="n" placeholder="Nominal (contoh 20k atau 15000)">${ty=='out'?`<select id="k">${CT.map(c=>`<option>${c}</option>`).join('')}</select>`:''}<input id="c" placeholder="Catatan (opsional)"><div class="bar"><button class="g" onclick="cl()">Batal</button><button onclick="doMv(${id},'${ty}')">Simpan</button></div>`)}
+function doMv(id,ty){const w=S.w.find(x=>x.id==id),n=num($('#n').value);if(n<=0)return;if(ty=='out'&&n>w.a&&!confirm('Nominal melebihi saldo dompet. Lanjut?'))return;
+ w.a+=ty=='in'?n:-n;S.t.unshift({d:Date.now(),w:w.id,y:ty,a:n,c:$('#c').value.trim(),k:ty=='out'?$('#k').value:''});save();cl();render()}
+function addW(){sheet(`<b>Dompet baru</b><input id="n" placeholder="Nama (contoh: Uang Darurat)"><input id="a" placeholder="Nominal awal (opsional)"><input id="g" placeholder="Target tabungan (opsional)"><select id="f">${S.f.map(f=>`<option value="${f.id}">${esc(f.n)}</option>`).join('')}</select><div class="bar"><button class="g" onclick="cl()">Batal</button><button onclick="doAddW()">Buat</button></div>`)}
+function doAddW(){const n=$('#n').value.trim();if(!n)return;const a=num($('#a').value),id=S.nid++;S.w.push({id,f:+$('#f').value,n,a,g:num($('#g').value),m:0,p:0});if(a>0)S.t.unshift({d:Date.now(),w:id,y:'in',a,c:'Saldo awal',k:''});save();cl();render()}
+function ed(id){const w=S.w.find(x=>x.id==id);sheet(`<b>Edit dompet</b><input id="n" value="${esc(w.n)}"><div class="mu">Target tabungan (0 = tanpa target)</div><input id="g" value="${w.g||0}"><div class="mu">Peringatan jika saldo di bawah (0 = mati)</div><input id="m" value="${w.m||0}"><div class="bar"><button class="g" onclick="cl()">Batal</button><button onclick="doEd(${id})">Simpan</button></div>`)}
+function doEd(id){const w=S.w.find(x=>x.id==id),n=$('#n').value.trim();if(n)w.n=n;w.g=num($('#g').value);w.m=num($('#m').value);save();cl();render()}
+function addF(){sheet(`<b>Folder baru</b><input id="n" placeholder="Nama folder (contoh: Bulan November)"><div class="bar"><button class="g" onclick="cl()">Batal</button><button onclick="doAddF()">Buat</button></div>`)}
+function doAddF(){const n=$('#n').value.trim();if(!n)return;S.f.push({id:S.nid++,n});save();cl();render()}
+function del(id){const w=S.w.find(x=>x.id==id);if(confirm('Hapus dompet "'+w.n+'"? Riwayatnya tetap ada di laporan.')){S.w=S.w.filter(x=>x.id!=id);save();render()}}
+/* bagi uang: mode nominal atau persen (persen terakhir tersimpan sebagai template) */
+function split(){if(!S.w.length)return;pm=false;sheet(`<b>Bagi uang ke dompet</b><input id="st" oninput="sp()" placeholder="Total uang (contoh 100k)"><button class="g s" id="pb" onclick="tp()">Mode: Nominal (tap untuk Persen)</button>${S.w.map(w=>`<div class="row"><span style="flex:1">${esc(w.n)}</span><input class="si" data-id="${w.id}" oninput="sp()" placeholder="0" style="width:120px"></div>`).join('')}
+ <div id="sr" class="mu" style="margin:6px 0">Sisa belum dibagi: Rp 0</div><div class="bar"><button class="g" onclick="cl()">Batal</button><button onclick="doSplit()">Simpan</button></div>`)}
+function tp(){pm=!pm;$('#pb').textContent=pm?'Mode: Persen (tap untuk Nominal)':'Mode: Nominal (tap untuk Persen)';document.querySelectorAll('.si').forEach(i=>{const w=S.w.find(x=>x.id==i.dataset.id);i.value=pm&&w.p?w.p:'';i.placeholder=pm?'%':'0'});sp()}
+const am=i=>pm?num($('#st').value)*num(i.value)/100:num(i.value);
+function sp(){const t=num($('#st').value);let s=0,p=0;document.querySelectorAll('.si').forEach(i=>{s+=am(i);p+=num(i.value)});const r=t-s,e=$('#sr');e.textContent='Sisa belum dibagi: '+rp(r)+(pm?' · Total persen: '+p+'%':'');e.className=r<-0.5?'out':'mu'}
+function doSplit(){const t=num($('#st').value);let s=0;const L=[];document.querySelectorAll('.si').forEach(i=>{const v=Math.round(am(i));if(v>0){s+=v;L.push([+i.dataset.id,v,num(i.value)])}});
+ if(!L.length)return;if(s>t+1)return alert('Pembagian melebihi total uang.');
+ L.forEach(([id,v,raw])=>{const w=S.w.find(w=>w.id==id);w.a+=v;if(pm)w.p=raw;S.t.unshift({d:Date.now(),w:id,y:'in',a:v,c:'Bagi uang',k:''})});save();cl();render()}
+function vc(){const k=['C','⌫','%','÷','7','8','9','×','4','5','6','−','1','2','3','+','0','000','.','='];
+ return `<div class="card" id="disp">${esc(expr||'0')}</div><div class="k">${k.map(x=>`<button class="${'÷×−+='.includes(x)?'o':''}" onclick="kp('${x}')">${x}</button>`).join('')}</div>`}
+function kp(x){if(x=='C')expr='';else if(x=='⌫')expr=expr.slice(0,-1);else if(x=='='){try{const e=expr.replace(/÷/g,'/').replace(/×/g,'*').replace(/−/g,'-').replace(/(\d+(?:\.\d+)?)%/g,'($1/100)');if(/^[0-9+\-*/.()\s]+$/.test(e)){const r=Function('"use strict";return ('+e+')')();expr=isFinite(r)?String(Math.round(r*1e6)/1e6):'Error'}}catch(e){expr='Error'}}
+ else{if(expr=='Error')expr='';expr+=x}$('#disp').textContent=expr||'0'}
+const nm=id=>(S.w.find(w=>w.id==id)||{n:'(dihapus)'}).n,dt=t=>new Date(t.d).toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'});
+function vl(){
+ const i=S.t.filter(t=>t.y=='in').reduce((a,t)=>a+t.a,0),o=S.t.filter(t=>t.y=='out').reduce((a,t)=>a+t.a,0),bk={};
+ S.t.filter(t=>t.y=='out').forEach(t=>{const k=t.k||'Lainnya';bk[k]=(bk[k]||0)+t.a});const mx=Math.max(1,...Object.values(bk));
+ return `<div class="card"><div class="row"><span class="mu">Total masuk</span><b class="in">${rp(i)}</b></div><div class="row"><span class="mu">Total keluar</span><b class="out">${rp(o)}</b></div><div class="row"><span class="mu">Selisih</span><b>${rp(i-o)}</b></div></div>
+ <div class="bar"><button class="g s" onclick="csv()">Ekspor CSV</button><button class="g s" onclick="print()">Cetak / PDF</button><button class="g s" onclick="bak()">Backup</button><button class="g s" onclick="$('#fi').click()">Impor</button></div>
+ <h2>Pengeluaran per kategori</h2>${Object.keys(bk).length?Object.entries(bk).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`<div class="row"><span>${esc(k)}</span><span>${rp(v)}</span></div><div class="pg"><i style="width:${v/mx*100}%"></i></div>`).join(''):'<div class="mu">Belum ada pengeluaran.</div>'}
+ <h2>Riwayat</h2>${S.t.length?S.t.slice(0,60).map(t=>`<div class="card"><div class="row"><b>${esc(nm(t.w))}</b><b class="${t.y}">${t.y=='in'?'+':'−'}${rp(t.a)}</b></div><div class="mu">${dt(t)}${t.k?' · '+esc(t.k):''}${t.c?' · '+esc(t.c):''}</div></div>`).join(''):'<div class="mu">Belum ada transaksi.</div>'}`}
+function dl(n,x,ty){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([x],{type:ty}));a.download=n;a.click()}
+function csv(){const q=s=>'"'+String(s).replace(/"/g,'""')+'"';dl('laporan-dompetku.csv',['Tanggal,Dompet,Jenis,Nominal,Kategori,Catatan'].concat(S.t.map(t=>[q(dt(t)),q(nm(t.w)),t.y=='in'?'Masuk':'Keluar',t.a,q(t.k||''),q(t.c||'')].join(','))).join('\n'),'text/csv')}
+function bak(){const us=ls('v2u')||{};dl('backup-dompetku-'+user+'.json',JSON.stringify(user=='tamu'?{u:'tamu',d:S}:{u:user,s:us[user],d:ls('v2d:'+user)}),'application/json')}
+function doImp(el){const f=el.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const j=JSON.parse(r.result);if(!j.u||!j.d)throw 0;
+ if(j.u=='tamu')ls('v2d:tamu',j.d);else{if(!j.s)throw 0;const us=ls('v2u')||{};us[j.u]=j.s;ls('v2u',us);ls('v2d:'+j.u,j.d)}
+ el.value='';lock(j.u=='tamu'?'Backup tamu dimuat. Pilih Masuk sebagai tamu.':'Backup dimuat. Masuk dengan username dan password lama.')}catch(e){alert('File backup tidak valid.')}};r.readAsText(f)}
+login();
+</script></body></html>
